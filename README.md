@@ -1,6 +1,6 @@
 # Hydrodynamic Forces and Torques on Spherical Particles in Flow
 
-This repository contains a dataset of hydrodynamic forces and torques acting on spherical particles suspended in a stationary flow. It serves as supplementary material for the paper **XXX**. If you use this repository, please cite **XXX**.
+This repository contains a dataset of hydrodynamic forces and torques acting on spherical particles suspended in a stationary flow together with Data-Driven models that predict the hydrodynamic forces acting on particles. It serves as supplementary material for the paper **XXX**. If you use this repository, please cite **XXX**.
 
 ## Repository Structure
 The repository consists of four main folders:

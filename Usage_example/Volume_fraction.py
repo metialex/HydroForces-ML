@@ -1,25 +1,22 @@
-from glob import glob
 from pathlib import Path
-from tqdm import tqdm
-from joblib import Parallel, delayed
-import multiprocessing
 import pyvista as pv
 import numpy as np
-import psutil, os
+import os
 import itertools
 import os.path
-from random import shuffle
-import pickle
 import math
 import copy
 import h5py
 import pandas as pd
 import overlap
 
-def calculateVolumeFraction(rawFile, dx, dy, dz, offset=(0, 0, 0), baseDir="",test=False,params_explicit=None):
+
+def calculateVolumeFraction(
+    rawFile, dx, dy, dz, offset=(0, 0, 0), baseDir="", test=False, params_explicit=None
+):
     """
 
-    Code to calulate volume fraction
+    Code to calculate volume fraction
 
     Args:
         rawFile: path to the simulation output
@@ -48,11 +45,19 @@ def calculateVolumeFraction(rawFile, dx, dy, dz, offset=(0, 0, 0), baseDir="",te
     Path(outVTKVOF).mkdir(parents=True, exist_ok=True)
     Path(outVTKPoints).mkdir(parents=True, exist_ok=True)
 
-    # Calulating the output file path
+    # Calculating the output file path
     if offset == (0, 0, 0):
         outPath = outVTKVOF + "VOF_" + fileName + ".vtk"
     else:
-        outPath = outVTKVOF + "/offset_" + str('_'.join(map(str, offset))) + "/" + "VOF_" + fileName + ".vtk"
+        outPath = (
+            outVTKVOF
+            + "/offset_"
+            + str("_".join(map(str, offset)))
+            + "/"
+            + "VOF_"
+            + fileName
+            + ".vtk"
+        )
 
     # Checking if a file is already present in the output location if yes then skipping
     if os.path.isfile(outPath) is True and test is False:
@@ -60,13 +65,17 @@ def calculateVolumeFraction(rawFile, dx, dy, dz, offset=(0, 0, 0), baseDir="",te
         return
 
     # Calculating the volume fraction
-    grid = volumeFractionCalculationStandard(rawFile, dx, dy, dz, outVTKVOF, offset=offset,params_explicit=params_explicit)
+    grid = volumeFractionCalculationStandard(
+        rawFile, dx, dy, dz, outVTKVOF, offset=offset, params_explicit=params_explicit
+    )
     return grid
     # Saving the particles as a VTK if required uncomment the following line
     # savePointDataAsVTK(rawFile, particlesDF, outVTKPoints)
 
 
-def volumeFractionCalculationStandard(path, dx, dy, dz, outPath, slack=1.2, offset=(0, 0, 0),params_explicit=None):
+def volumeFractionCalculationStandard(
+    path, dx, dy, dz, outPath, slack=1.2, offset=(0, 0, 0), params_explicit=None
+):
     """
 
     Code to calculate volume fraction in a uniform grid.
@@ -92,13 +101,12 @@ def volumeFractionCalculationStandard(path, dx, dy, dz, outPath, slack=1.2, offs
         params = getSimParams(path)
         particlesDF = getSimParticles(path)
 
-        #pd.DataFrame(data=[params]).to_csv(outPath+"parameters.csv")
-        #particlesDF.to_csv(outPath+"particles.csv")
-        
+        # pd.DataFrame(data=[params]).to_csv(outPath+"parameters.csv")
+        # particlesDF.to_csv(outPath+"particles.csv")
+
     else:
-        params,particlesDF = params_explicit
-   
-    
+        params, particlesDF = params_explicit
+
     # print(particlesDF)
 
     # dx = dy = dz = 1.0
@@ -114,7 +122,11 @@ def volumeFractionCalculationStandard(path, dx, dy, dz, outPath, slack=1.2, offs
     # Setting the grid parameters
     grid = pv.UniformGrid()
     grid.dimensions = [nx + 1, ny + 1, nz + 1]
-    grid.origin = (params["xmin"] + offset[0], params["ymin"] + offset[0], params["zmin"] + offset[0])
+    grid.origin = (
+        params["xmin"] + offset[0],
+        params["ymin"] + offset[0],
+        params["zmin"] + offset[0],
+    )
     grid.spacing = (dx, dy, dz)
 
     # Creating a scalar values to store the VOF and setting them as zeros
@@ -124,24 +136,35 @@ def volumeFractionCalculationStandard(path, dx, dy, dz, outPath, slack=1.2, offs
 
     # Calculating the extents of the domain
     extent = np.abs(
-        [grid.bounds[1] - grid.bounds[0], grid.bounds[3] - grid.bounds[2], grid.bounds[5] - grid.bounds[4]])
+        [
+            grid.bounds[1] - grid.bounds[0],
+            grid.bounds[3] - grid.bounds[2],
+            grid.bounds[5] - grid.bounds[4],
+        ]
+    )
 
     # lopping through individual particles and updating the Volume fraction of the cells that particle affects
     for idx in range(particlesDF.values[0:, 0:3].shape[0]):
-
         # finding the cell closest to the particle and getting its ID. This process is quite slow
         gridIdx = grid.find_closest_cell(particlesDF.values[idx, 0:3])
         cell = grid.extract_cells(gridIdx)
 
         if cell.n_cells == 0:
             # print("here", particlesDF.values[idx, 0:3], np.array([0, 0, 0]))
-            cell, particleTemp, gridIdx = applyPeriodicBoundaryCondition(particlesDF.values[idx, 0:4], np.expand_dims(particlesDF.values[idx, 0:3], axis=0),
-                                                  np.array([0, 0, 0]), grid, extent)
+            cell, particleTemp, gridIdx = applyPeriodicBoundaryCondition(
+                particlesDF.values[idx, 0:4],
+                np.expand_dims(particlesDF.values[idx, 0:3], axis=0),
+                np.array([0, 0, 0]),
+                grid,
+                extent,
+            )
             # print(particleTemp, cell.cell_centers().points, gridIdx)
             particlesDF.values[idx, 0:4] = particleTemp
 
         # Calculating the number of adjacent cells the point might occupy
-        searchRadius = int(np.ceil(((particlesDF.values[idx, 3] / cubeSize) * slack) + 1))
+        searchRadius = int(
+            np.ceil(((particlesDF.values[idx, 3] / cubeSize) * slack) + 1)
+        )
         searchRange = list(range(-searchRadius + 1, searchRadius))
 
         # Creating a neighbour list with the indices of the cells that might intersect with the particle
@@ -150,10 +173,8 @@ def volumeFractionCalculationStandard(path, dx, dy, dz, outPath, slack=1.2, offs
         # getting the cell center of the cell closest to the point
         cellCenterPos = cell.cell_centers().points
 
-
         # Iterating though the neighbour cells
         for neighbour in neighbourhood:
-
             # Calculating the offset of the neighbour and extracting the respective cell (also slow)
             offSet = np.array(neighbour) * [dx, dy, dz]
             gridIdx = grid.find_closest_cell(cellCenterPos + offSet)
@@ -165,17 +186,22 @@ def volumeFractionCalculationStandard(path, dx, dy, dz, outPath, slack=1.2, offs
                 # Create a copy of the particle
                 particleTemp = copy.deepcopy(particlesDF.values[idx, 0:4])
 
-                cell, particleTemp, gridIdx = applyPeriodicBoundaryCondition(particleTemp, cellCenterPos, offSet, grid, extent)
+                cell, particleTemp, gridIdx = applyPeriodicBoundaryCondition(
+                    particleTemp, cellCenterPos, offSet, grid, extent
+                )
                 # Calculate how much the particle intersects with the cell and add to the cells value
-                grid.cell_arrays["values"][gridIdx] = grid.cell_arrays["values"][gridIdx] + \
-                                                      calculateOverlap(cell, particleTemp)
+                grid.cell_arrays["values"][gridIdx] = grid.cell_arrays["values"][
+                    gridIdx
+                ] + calculateOverlap(cell, particleTemp)
 
             # If the periodic boundary check does not take place calculate the overlapping volume and add to
             # the corresponding cell
-            elif checkPotentialIntersection(cell, particlesDF.values[idx, 0:4], cubeSize, slack=slack):
-
-                grid.cell_arrays["values"][gridIdx] = grid.cell_arrays["values"][gridIdx] + \
-                                                      calculateOverlap(cell, particlesDF.values[idx, 0:4])
+            elif checkPotentialIntersection(
+                cell, particlesDF.values[idx, 0:4], cubeSize, slack=slack
+            ):
+                grid.cell_arrays["values"][gridIdx] = grid.cell_arrays["values"][
+                    gridIdx
+                ] + calculateOverlap(cell, particlesDF.values[idx, 0:4])
 
     # divide the cell values by volume of the cell
     grid.cell_arrays["values"] = grid.cell_arrays["values"] / (dx * dy * dz)
@@ -185,11 +211,20 @@ def volumeFractionCalculationStandard(path, dx, dy, dz, outPath, slack=1.2, offs
         grid.save(outPath + "VOF_" + path.split("/")[-1][0:-3] + ".vtk")
 
     else:
-
-        Path(outPath + "/offset_" + str('_'.join(map(str, offset))) + "/").mkdir(parents=True, exist_ok=True)
+        Path(outPath + "/offset_" + str("_".join(map(str, offset))) + "/").mkdir(
+            parents=True, exist_ok=True
+        )
 
         # Save the VOF grid
-        grid.save(outPath + "/offset_" + str('_'.join(map(str, offset))) + "/" + "VOF_" + path.split("/")[-1][0:-3] + ".vtk")
+        grid.save(
+            outPath
+            + "/offset_"
+            + str("_".join(map(str, offset)))
+            + "/"
+            + "VOF_"
+            + path.split("/")[-1][0:-3]
+            + ".vtk"
+        )
 
     return grid
 
@@ -205,7 +240,7 @@ def getSimParams(path):
         dict: returns a dictionary with the simulation parameters
 
     """
-    f = h5py.File(path, 'r')
+    f = h5py.File(path, "r")
     keys = list(f.keys())
     keys.remove("fixed")
 
@@ -230,13 +265,13 @@ def getSimParticles(path):
     """
 
     # Reading the particle positions and converting them to DF
-    f = h5py.File(path, 'r')
+    f = h5py.File(path, "r")
     pos = f["fixed"]["X"][()]
-    pos = pd.DataFrame(pos, columns=['xPos', 'yPos', 'zPos'])
+    pos = pd.DataFrame(pos, columns=["xPos", "yPos", "zPos"])
 
     # Adding particle radius to the DF
     R = f["fixed"]["R"][()]
-    R = pd.DataFrame(R, columns=['R'])
+    R = pd.DataFrame(R, columns=["R"])
 
     # Adding Re to the DF
     Re = f["Re"][()]
@@ -248,20 +283,21 @@ def getSimParticles(path):
 
     # Adding F to the df
     F = f["fixed"]["F"][()]
-    F = pd.DataFrame(F, columns=['xForce', 'yForce', 'zForce'])
+    F = pd.DataFrame(F, columns=["xForce", "yForce", "zForce"])
 
     # Adding T to the df
     torque = f["fixed"]["T"][()]
-    torque = pd.DataFrame(torque, columns=['xTorque', 'yTorque', 'zTorque'])
+    torque = pd.DataFrame(torque, columns=["xTorque", "yTorque", "zTorque"])
 
     # Merging the multiple dataframes into the required output DF
-    outDF = pos.merge(R, left_index=True, right_index=True, how='inner')
-    outDF = outDF.merge(Re, left_index=True, right_index=True, how='inner')
-    outDF = outDF.merge(phi, left_index=True, right_index=True, how='inner')
-    outDF = outDF.merge(F, left_index=True, right_index=True, how='inner')
-    outDF = outDF.merge(torque, left_index=True, right_index=True, how='inner')
+    outDF = pos.merge(R, left_index=True, right_index=True, how="inner")
+    outDF = outDF.merge(Re, left_index=True, right_index=True, how="inner")
+    outDF = outDF.merge(phi, left_index=True, right_index=True, how="inner")
+    outDF = outDF.merge(F, left_index=True, right_index=True, how="inner")
+    outDF = outDF.merge(torque, left_index=True, right_index=True, how="inner")
 
     return outDF
+
 
 def applyPeriodicBoundaryCondition(particle, cellCenterPos, offSet, grid, extent):
     """
@@ -271,20 +307,25 @@ def applyPeriodicBoundaryCondition(particle, cellCenterPos, offSet, grid, extent
     particleTemp = copy.deepcopy(particle)
 
     # Calculate the position of the particle after applying periodic boundary condition
-    tempPos = (cellCenterPos + offSet)
+    tempPos = cellCenterPos + offSet
     condition = tempPos - [grid.bounds[1], grid.bounds[3], grid.bounds[5]] > 0
 
     tempPos[condition] = tempPos[condition] - extent[condition[0]]
-    particleTemp[0:3][condition[0]] = particleTemp[0:3][condition[0]] - extent[condition[0]]
+    particleTemp[0:3][condition[0]] = (
+        particleTemp[0:3][condition[0]] - extent[condition[0]]
+    )
 
     condition = tempPos - [grid.bounds[0], grid.bounds[2], grid.bounds[4]] < 0
     tempPos[condition] = tempPos[condition] + extent[condition[0]]
-    particleTemp[0:3][condition[0]] = particleTemp[0:3][condition[0]] + extent[condition[0]]
+    particleTemp[0:3][condition[0]] = (
+        particleTemp[0:3][condition[0]] + extent[condition[0]]
+    )
 
     gridIdx = grid.find_closest_cell(tempPos)
     cell = grid.extract_cells(gridIdx)
 
     return cell, particleTemp, gridIdx
+
 
 def calculateOverlap(cell, particle):
     """
@@ -299,22 +340,34 @@ def calculateOverlap(cell, particle):
 
     """
 
-    # verticles of the example subdomain
+    # verticals of the example subdomain
     vertices = cell.points
 
-    vertices = [vertices[0], vertices[1], vertices[3], vertices[2], vertices[4], vertices[5], vertices[7], vertices[6]]
+    vertices = [
+        vertices[0],
+        vertices[1],
+        vertices[3],
+        vertices[2],
+        vertices[4],
+        vertices[5],
+        vertices[7],
+        vertices[6],
+    ]
 
     # creating a hexahedron
     hexa = overlap.Hexahedron(vertices)
 
-    s = overlap.Sphere((particle[0], particle[1], particle[2]), particle[3])  # creating the particle/sphere
+    s = overlap.Sphere(
+        (particle[0], particle[1], particle[2]), particle[3]
+    )  # creating the particle/sphere
 
     # Calculating the overlap between the sphere and the hexagon
     volume = overlap.overlap(s, hexa)
 
     return volume
 
-# Check if a particle intersects a cell (very aproximate test)
+
+# Check if a particle intersects a cell (very approximate test)
 def checkPotentialIntersection(cell, particle, cubeSize, slack=1.2):
     x1, y1, z1 = cell.center
     x2, y2, z2 = particle[0:3]

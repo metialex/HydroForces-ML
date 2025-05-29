@@ -1,4 +1,4 @@
-# Present script analyses VOF mesh that we constructed for ht eSeyed data and
+# Present script analyses VOF mesh that we constructed for the Seyed data and
 # creates a correlation plot that compare the DNS results and results of the model
 # Use the command "conda activate TF_2_4_py_3_8" in order to activate the correct environment
 

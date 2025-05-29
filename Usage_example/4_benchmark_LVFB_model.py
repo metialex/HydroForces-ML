@@ -39,10 +39,6 @@ def main():
         "Re_2_phi_20_VOF_processed/dx_0.5_dy_0.5_dz_0.5/VTKVOF/VOF_Particle_data_1.vtk"
     )
     h5_file = "../Test_data/Re_2_phi_20/Particle_data_1.h5"
-    csv_name = out_folder_name + "/" + model_type + "_" + model_name + ".csv"
-
-    # Load existing data (True) or generate new (False)
-    load_res_flag = True
 
     # Load simulation parameters and particle data
     params = getSimParams(h5_file)
@@ -50,8 +46,6 @@ def main():
 
     # Load VTK grid data
     grid = pv.read(vtk_file)
-    y_real = []
-    y_predict = []
     tf.config.optimizer.set_jit(False)
     tf.config.optimizer.set_experimental_options({"disable_meta_optimizer": True})
 
@@ -145,7 +139,7 @@ def main():
     batch_size_to_test = [1, 16, 32, 64, 128, 256, 512]
 
     for batch_size in batch_size_to_test:
-        # Artificially increase the input data size to 1000 times the batch size for benchmarking
+        # Artificially increase the input data size to 100 times the batch size for benchmarking
         N = 100 * batch_size
         N = N if N > X.shape[0] else X.shape[0]
         X_tmp = tf.tile(

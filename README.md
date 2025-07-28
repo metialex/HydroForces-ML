@@ -91,4 +91,10 @@ Each `.h5` file represents a single simulation and includes:
 
 ---
 
-This dataset provides a comprehensive foundation for training and evaluating models that predict hydrodynamic forces on particles in flow environments.
+### Drag Validation
+
+The mean drag force, $\langle F_d \rangle$, normalized by the Stokes drag force is presented in the figure below. The present data is compared with existing literature. The non-dimensional Stokes drag force can be estimated as
+
+$$F_{d,St} = 3 \pi / Re$$
+
+![Drag force validation](Drag_validation.png)
